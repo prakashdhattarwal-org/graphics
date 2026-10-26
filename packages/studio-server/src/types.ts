@@ -180,6 +180,7 @@ export interface StudioApiAdapter {
     videoBitrate?: string;
     videoFrameFormat?: "auto" | "jpg" | "png";
     hdrMode?: "auto" | "force-hdr" | "force-sdr";
+    chromaSubsampling?: "420" | "444";
     jobId: string;
     /**
      * The triggering browser profile has telemetry disabled (localStorage
