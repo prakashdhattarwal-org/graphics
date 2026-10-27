@@ -390,6 +390,25 @@ export function setElementStyles(el: Element, updates: Record<string, string | n
   }
 }
 
+function findStyleRestoreAnchors(
+  original: readonly [string, string][],
+  current: readonly [string, string][],
+  selected: ReadonlySet<string>,
+) {
+  const remaining = new Map<string, number>();
+  for (const [prop] of original) remaining.set(prop, (remaining.get(prop) ?? 0) + 1);
+  const anchors: { prop: string; end: number }[] = [];
+  let end = 0;
+  for (const [prop] of current) {
+    if (!selected.has(prop)) end++;
+    const count = remaining.get(prop) ?? 0;
+    if (count === 0) continue;
+    remaining.set(prop, count - 1);
+    anchors.push({ prop, end });
+  }
+  return anchors;
+}
+
 export function restoreElementStyleProperties(
   el: Element,
   originalStyle: string,
@@ -398,9 +417,8 @@ export function restoreElementStyleProperties(
   const selected = new Set(properties);
   const original = parseStyleDeclarations(originalStyle);
   const originalUntouched = original.filter(([prop]) => !selected.has(prop));
-  const untouched = parseStyleDeclarations(el.getAttribute("style") ?? "").filter(
-    ([prop]) => !selected.has(prop),
-  );
+  const current = parseStyleDeclarations(el.getAttribute("style") ?? "");
+  const untouched = current.filter(([prop]) => !selected.has(prop));
   if (
     untouched.length === originalUntouched.length &&
     untouched.every(
@@ -413,17 +431,17 @@ export function restoreElementStyleProperties(
   }
 
   const restored: [string, string][] = [];
+  const anchors = findStyleRestoreAnchors(original, current, selected);
   let index = 0;
+  let anchorIndex = 0;
   for (const declaration of original) {
-    if (selected.has(declaration[0])) {
-      restored.push(declaration);
-      continue;
+    const anchor = anchors[anchorIndex];
+    if (anchor?.prop === declaration[0]) {
+      for (const retained of untouched.slice(index, anchor.end)) restored.push(retained);
+      index = anchor.end;
+      anchorIndex++;
     }
-    const current = untouched[index];
-    if (current?.[0] === declaration[0]) {
-      restored.push(current);
-      index++;
-    }
+    if (selected.has(declaration[0])) restored.push(declaration);
   }
   const serialized = serializeStyleAttr(restored.concat(untouched.slice(index)));
   el.setAttribute("style", serialized);

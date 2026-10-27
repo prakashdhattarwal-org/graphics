@@ -1030,6 +1030,48 @@ describe("editing duplicate inline declarations", () => {
     comp.dispose();
   });
 
+  describe.each([
+    {
+      name: "a new leading declaration",
+      originalStyle: "background-color:blue;background:red;background:green",
+      remoteStyle: "opacity:0.5;background-color:blue;",
+      restoredStyle: "opacity: 0.5; background-color: blue; background: red; background: green",
+    },
+    {
+      name: "an extra leading duplicate",
+      originalStyle: "color:red;opacity:1;background-color:blue;background:red;background:green",
+      remoteStyle: "color:pink;color:red;opacity:1;background-color:blue;",
+      restoredStyle:
+        "color: pink; color: red; opacity: 1; background-color: blue; background: red; background: green",
+    },
+    {
+      name: "an extra longhand before the edited property",
+      originalStyle: "background-color:blue;background:red;background:green",
+      remoteStyle: "background-color:blue;background-color:purple;",
+      restoredStyle:
+        "background-color: blue; background-color: purple; background: red; background: green",
+    },
+  ])("undo after $name", ({ originalStyle, remoteStyle, restoredStyle }) => {
+    it.each(["yellow", null])("keeps declaration order for background=%s", async (background) => {
+      const source = `<span data-hf-id="hf-title" style="${originalStyle}">hello</span>`;
+      const comp = await openComposition(source, { coalesceMs: 0 });
+      comp.setStyle("hf-title", { background });
+      comp.applyPatches([
+        {
+          op: "replace",
+          path: "/elements/hf-title/attributes/style",
+          value: remoteStyle + (background === null ? "" : `background:${background}`),
+        },
+      ]);
+      comp.undo();
+      expect(comp.serialize()).toContain(`style="${restoredStyle}"`);
+      const reopened = await openComposition(source, { overrides: comp.getOverrides() });
+      expect(reopened.serialize()).toBe(comp.serialize());
+      reopened.dispose();
+      comp.dispose();
+    });
+  });
+
   it.each(["yellow", null])(
     "preserves shorthand order when undoing background=%s after untracked changes",
     async (background) => {
