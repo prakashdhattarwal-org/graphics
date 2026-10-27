@@ -1030,6 +1030,44 @@ describe("editing duplicate inline declarations", () => {
     comp.dispose();
   });
 
+  it.each(["yellow", null])(
+    "preserves shorthand order when undoing background=%s after untracked changes",
+    async (background) => {
+      const source =
+        '<span data-hf-id="hf-title" style="opacity:1;background:red;background:green;background-color:blue">hello</span>';
+      const comp = await openComposition(source, {
+        trackedOrigins: ["local"],
+        coalesceMs: 0,
+      });
+      comp.setStyle("hf-title", { background });
+      comp.dispatch(
+        { type: "setStyle", target: "hf-title", styles: { opacity: null } },
+        { origin: "remote" },
+      );
+      comp.undo();
+      expect(comp.serialize()).toContain(
+        'style="background: red; background: green; background-color: blue"',
+      );
+      const reopened = await openComposition(source, { overrides: comp.getOverrides() });
+      expect(reopened.serialize()).toBe(comp.serialize());
+      reopened.dispose();
+
+      comp.redo();
+      comp.dispatch(
+        { type: "setStyle", target: "hf-title", styles: { opacity: "0.5" } },
+        { origin: "remote" },
+      );
+      comp.undo();
+      expect(comp.serialize()).toContain(
+        'style="background: red; background: green; background-color: blue; opacity: 0.5"',
+      );
+      const reinserted = await openComposition(source, { overrides: comp.getOverrides() });
+      expect(reinserted.serialize()).toBe(comp.serialize());
+      reinserted.dispose();
+      comp.dispose();
+    },
+  );
+
   it.each(["flex", null])(
     "keeps untracked style changes when undoing display=%s",
     async (display) => {

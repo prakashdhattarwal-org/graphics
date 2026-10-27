@@ -419,8 +419,11 @@ export function restoreElementStyleProperties(
       restored.push(declaration);
       continue;
     }
-    const current = untouched[index++];
-    if (current) restored.push(current);
+    const current = untouched[index];
+    if (current?.[0] === declaration[0]) {
+      restored.push(current);
+      index++;
+    }
   }
   const serialized = serializeStyleAttr(restored.concat(untouched.slice(index)));
   el.setAttribute("style", serialized);
